@@ -14,7 +14,9 @@ rm -rf out/release dist
 mkdir -p $R/linux/models $R/documents dist
 cp out/alpine.img src/linux/boot.sh src/linux/ownlinux.conf kindle/linux/wifi.conf.example kindle/linux/dashboard.conf.example $R/linux/
 echo UTC > $R/linux/timezone
-cp downloads/models/SmolLM2-135M-Instruct-Q4_0.gguf $R/linux/models/smollm2-135m-q4_0.gguf
+if [ "${BUILD_LLM:-1}" = 1 ]; then
+    cp downloads/models/SmolLM2-135M-Instruct-Q4_0.gguf $R/linux/models/smollm2-135m-q4_0.gguf
+fi
 cp kindle/documents/Inkwell\ -\ *.sh $R/documents/
 (cd $R && zip -q -r -9 "../../../dist/Inkwell-$V.zip" linux documents)
 (cd dist && shasum -a 256 * > SHA256SUMS)

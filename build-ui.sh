@@ -8,8 +8,13 @@ mkdir -p out
 # corrupting it (musl supports this in static builds).
 HARDEN="-fstack-protector-strong"
 UI="-Ithird_party/stb -Wno-unused-function -s $HARDEN"
-for p in home splash wifi settings notes sketch browser term chess books arxiv sshapp dashboard; do tools/kcc $UI -o out/$p src/ui/$p.c; done
+for p in home splash wifi settings notes sketch browser term books arxiv sshapp dashboard; do tools/kcc $UI -o out/$p src/ui/$p.c; done
 tools/kcc -s -o out/tap src/test/tap.c
+if [ "${BUILD_LLM:-1}" = 1 ]; then
 tools/kcc $UI -o out/quill src/chat/quill.c
 tools/kcc -s $HARDEN -o out/quill-code src/chat/quillcode.c
+fi
+if [ "${BUILD_GAMES:-1}" = 1 ]; then
+tools/kcc $UI -o out/chess src/ui/chess.c
 ./build.sh >/dev/null
+fi

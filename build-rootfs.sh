@@ -15,14 +15,14 @@ e2() { for d in /opt/homebrew/opt/e2fsprogs/sbin /usr/local/opt/e2fsprogs/sbin /
 # Alpine keeps debugfs in a different directory from mke2fs.
 MKE2FS=$(e2 mke2fs) DEBUGFS=$(e2 debugfs) E2FSCK=$(e2 e2fsck)
 TZ_NAME="${TZ_NAME:-UTC}"
-MIRROR=https://dl-cdn.alpinelinux.org/alpine/v3.24
+MIRROR=${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}/v3.24
 # mupdf-tools renders PDF and EPUB pages for Books and arXiv, and python3 runs
 # the code Quill writes in the terminal.
 PKGS="dropbear dropbear-scp dropbear-dbclient busybox-extras wpa_supplicant tzdata curl mupdf-tools python3 python3-pyc"
 
 ./build-ui.sh
-./build-doom.sh >/dev/null
-./build-llm.sh >/dev/null
+if [ "${BUILD_GAMES:-1}" = 1 ]; then ./build-doom.sh >/dev/null; fi
+if [ "${BUILD_LLM:-1}" = 1 ]; then ./build-llm.sh >/dev/null; fi
 
 rm -rf "$S" "$IMG"
 mkdir -p "$S"
@@ -54,10 +54,23 @@ fi
 chmod 700 "$S/root" "$S/root/.ssh"
 chmod 1777 "$S/tmp"
 cp fonts/*.ttf "$S/usr/share/fonts/inkwell/"
-for p in home splash wifi settings notes sketch browser term chess books arxiv sshapp dashboard doom quill quill-code inkllm tap; do cp out/$p "$S/usr/local/bin/"; done
+for p in home splash wifi settings notes sketch browser term books arxiv sshapp dashboard tap; do cp out/$p "$S/usr/local/bin/"; done
+if [ "${BUILD_LLM:-1}" = 1 ]; then
+    for p in quill quill-code inkllm; do cp out/$p "$S/usr/local/bin/"; done
+else
+    sed -i.orig '/^Quill|/d' "$S/etc/own/apps"
+    rm -f "$S/etc/own/apps.orig" "$S/usr/local/bin/getmodel"
+    rm -rf "$S/usr/local/share/quill"
+fi
+if [ "${BUILD_GAMES:-1}" = 1 ]; then
+cp out/chess out/doom "$S/usr/local/bin/"
 cp out/rd-kindle out/triking "$S/usr/local/games/"
 mkdir -p "$S/usr/local/share/doom"
 cp downloads/doom/doom1.wad "$S/usr/local/share/doom/" # the shareware episode, free to share
+else
+    sed -i.orig -e '/^Minecraft|/d' -e '/^TriKing|/d' -e '/^Doom|/d' -e '/^Chess|/d' "$S/etc/own/apps"
+    rm -f "$S/etc/own/apps.orig"
+fi
 cp "$S/usr/share/zoneinfo/$TZ_NAME" "$S/etc/localtime"
 echo "$TZ_NAME" > "$S/etc/timezone"
 ln -sf /usr/local/bin/kindle "$S/usr/bin/kindle"

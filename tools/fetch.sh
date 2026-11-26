@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")/.."
 D=downloads
-ALPINE=https://dl-cdn.alpinelinux.org/alpine/v3.24
+ALPINE=${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}/v3.24
 mkdir -p $D/alpine $D/alpine-dev $D/sysroot $D/llama $D/doom
 
 get() { # url file [sha256]
@@ -39,17 +39,21 @@ if [ ! -f $D/sysroot/usr/lib/libc.a ]; then
     done
 fi
 
+if [ "${BUILD_LLM:-1}" = 1 ]; then
 get https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.7.0.tar.gz $D/llama/src.tar.gz \
     55d67acf3ad2ad747a9bbeb75f9f0e173dbcc0d1753a471038a90c819421c5e1
 [ -d $D/llama/llama.cpp-0.7.0 ] || tar -xzf $D/llama/src.tar.gz -C $D/llama
+fi
 
 # id Software's shareware episode, which may be shared unchanged. Debian
 # packages the original file.
+if [ "${BUILD_GAMES:-1}" = 1 ]; then
 if [ ! -s $D/doom/doom1.wad ]; then
-    get http://deb.debian.org/debian/pool/non-free/d/doom-wad-shareware/doom-wad-shareware_1.9.fixed-5_all.deb $D/doom/wad.deb
+    get https://deb.debian.org/debian/pool/non-free/d/doom-wad-shareware/doom-wad-shareware_1.9.fixed-5_all.deb $D/doom/wad.deb
     (cd $D/doom && ar x wad.deb data.tar.xz && tar -xJOf data.tar.xz ./usr/share/games/doom/doom1.wad > doom1.wad && rm wad.deb data.tar.xz)
 fi
 echo "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771  $D/doom/doom1.wad" | shasum -a 256 -c >/dev/null
+fi
 
-tools/get-models.sh
+if [ "${BUILD_LLM:-1}" = 1 ]; then tools/get-models.sh; fi
 echo "downloads are ready"
