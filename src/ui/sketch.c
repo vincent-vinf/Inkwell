@@ -10,10 +10,17 @@
 #define BAR_H 150
 #define FLUSH_MS 45
 
-enum { T_FINE, T_PEN, T_MARKER, T_ERASER, NTOOLS };
-static const float tool_size[NTOOLS] = {3, 7, 16, 48};
+enum { T_PEN, T_MARKER, T_ERASER, NTOOLS };
+static const float tool_size[NTOOLS] = {7, 16, 48};
 static int tool = T_PEN;
-static rect tool_r[NTOOLS], clear_btn, save_btn;
+static rect tool_r[NTOOLS], undo_btn, clear_btn, save_btn;
+
+/* Keep one canvas-sized snapshot so Undo can restore the previous stroke. */
+static snapshot undo_snapshot;
+static void discard_undo(void) {
+    free(undo_snapshot.px);
+    undo_snapshot.px = 0;
+}
 
 /* ---- files -------------------------------------------------------------------- */
 
@@ -67,20 +74,22 @@ static void draw_bar(void) {
     line(cx + 8, cy - 15, cx - 8, cy, 5, BLACK);
     line(cx - 8, cy, cx + 8, cy + 15, 5, BLACK);
     int x = 190;
-    for (int t = 0; t < NTOOLS; t++) {
+    for (int t = T_PEN; t <= T_MARKER; t++) {
         tool_r[t] = (rect){x, 25, 100, 100};
         float tx = x + 50, ty = 75;
         if (t == tool) rrect_fill(x, 25, 100, 100, 22, 0xD0);
-        if (t == T_ERASER) {
-            rrect_line(tx - 26, ty - 16, 52, 32, 8, 4, BLACK);
-            line(tx - 6, ty - 16, tx - 6, ty + 16, 3, BLACK);
-        } else {
-            disc(tx, ty, tool_size[t] / 2 + 1, BLACK);
-        }
+        disc(tx, ty, tool_size[t] / 2 + 1, BLACK);
         x += 116;
     }
+    tool_r[T_ERASER] = (rect){x, 25, 100, 100};
+    float tx = x + 50, ty = 75;
+    if (tool == T_ERASER) rrect_fill(x, 25, 100, 100, 22, 0xD0);
+    rrect_line(tx - 26, ty - 16, 52, 32, 8, 4, BLACK);
+    line(tx - 6, ty - 16, tx - 6, ty + 16, 3, BLACK);
+    undo_btn = (rect){W - MARGIN - 570, 35, 170, 80};
     clear_btn = (rect){W - MARGIN - 380, 35, 170, 80};
     save_btn = (rect){W - MARGIN - 190, 35, 190, 80};
+    pill(undo_btn, "Undo", 0);
     pill(clear_btn, "Clear", 0);
     pill(save_btn, "Save", 1);
     fill(0, BAR_H - 2, W, 2, BLACK);
@@ -138,9 +147,18 @@ int main(void) {
         if (e.type == EV_NONE) { flush(); continue; }
         if (e.type == EV_POWER) break;
         if (e.type == EV_DOWN) {
-            if (e.y >= BAR_H) { drawing = 1; lx = e.x; ly = e.y; segment(lx, ly, lx, ly); continue; }
+            if (e.y >= BAR_H) {
+                discard_undo();
+                undo_snapshot = snap(0, BAR_H, W, H - BAR_H);
+                drawing = 1;
+                lx = e.x;
+                ly = e.y;
+                segment(lx, ly, lx, ly);
+                continue;
+            }
             drawing = 0;
             if (hit(back_btn, e.x, e.y)) press_on(back_btn);
+            else if (hit(undo_btn, e.x, e.y)) press_on(undo_btn);
             else if (hit(clear_btn, e.x, e.y)) press_on(clear_btn);
             else if (hit(save_btn, e.x, e.y)) press_on(save_btn);
             continue;
@@ -154,9 +172,18 @@ int main(void) {
         if (hit(back_btn, e.x, e.y)) { press_forget(); break; }
         if (hit(clear_btn, e.x, e.y)) {
             press_forget();
+            discard_undo();
             fill(0, BAR_H, W, H - BAR_H, WHITE);
             draw_bar();
             flip_flash();
+            continue;
+        }
+        if (hit(undo_btn, e.x, e.y)) {
+            press_off();
+            if (undo_snapshot.px) {
+                unsnap(&undo_snapshot);
+                refresh(0, BAR_H, W, H - BAR_H, WF_GL16, 0, 0);
+            }
             continue;
         }
         if (hit(save_btn, e.x, e.y)) {
